@@ -30,6 +30,8 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Iterator;
 import java.util.List;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
 
 
 public class DiscDiagram extends Application {
@@ -48,7 +50,18 @@ public class DiscDiagram extends Application {
     public void start(Stage stage) {
         long start = System.nanoTime();
         System.out.println("Создаю дерево каталогов...");
+//        ThreadManager.service= ForkJoinPool.commonPool();
         Branch trunk = new Branch(homeDirectory);
+        ThreadManager.service.submit(trunk);
+        waitUntilTreeBuilds();
+        ThreadManager.service.shutdown();
+        try {
+            trunk.receiveBranches();
+        } catch (ExecutionException e) {
+            e.printStackTrace();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
         long finish = System.nanoTime();
         long duration = finish - start;
         System.out.println("Дерево каталогов создано за " + toString(duration));
@@ -85,6 +98,14 @@ public class DiscDiagram extends Application {
 
         root.getChildren().addAll(chart);
         System.out.println();
+    }
+
+    private void waitUntilTreeBuilds() {
+        try {
+            ThreadManager.service.awaitTermination(1, TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
     }
 
     private String toString(long duration) {
