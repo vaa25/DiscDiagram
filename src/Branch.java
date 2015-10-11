@@ -29,9 +29,6 @@ public class Branch extends RecursiveTask<Branch> implements Callable<Branch> {
     private Path path;
     private Branch parent;
 
-    public Branch(Path path) {
-        this(path, 0, null);
-    }
 
     public Branch(Path path, int id, Branch parent) {
         this.id = id;
@@ -46,14 +43,14 @@ public class Branch extends RecursiveTask<Branch> implements Callable<Branch> {
             branchesSize += branch.size;
         }
         size = branchesSize + leafsSize;
-        if (isFirstChild(path, parent)) {
-            int kB = 1024;
-            int mB = kB * 1024;
-            int gB = mB * 1024;
-            String size$ = String.valueOf(size > gB ? size / gB + " GB" : size > mB ? size / mB + " mB" : size > kB ? size / kB + " kB" : size + " bytes");
 
-//            System.out.println(size$);
-        }
+    }
+
+    private String getSize$() {
+        int kB = 1024;
+        int mB = kB * 1024;
+        int gB = mB * 1024;
+        return String.valueOf(size > gB ? size / gB + " GB" : size > mB ? size / mB + " mB" : size > kB ? size / kB + " kB" : size + " bytes");
     }
 
     private Branch getBranch(Future<Branch> future) {
@@ -73,13 +70,14 @@ public class Branch extends RecursiveTask<Branch> implements Callable<Branch> {
 
     @Override
     protected Branch compute() {
-        if (isFirstChild(path, parent)) {
-//            System.out.print("Обрабатываю " + path + " и его подкаталоги...   ");
-        }
+
         branches = new ArrayList<>();
         leafsSize = 0;
         branchesSize = 0;
         addFiles();
+        if (isFirstChild(path, parent)) {
+            System.out.println("Обработал " + path + " и его подкаталоги...   " + getSize$());
+        }
         return this;
     }
 
@@ -91,21 +89,20 @@ public class Branch extends RecursiveTask<Branch> implements Callable<Branch> {
     private void addFiles() {
         try {
             try (DirectoryStream<Path> entries = Files.newDirectoryStream(path)) {
-//                System.out.println(entries.getClass().getName());
                 Collection<Branch> directories = new ArrayList<>();
                 for (Path path : entries) {
                     if (Files.isDirectory(path)) {
-                        Branch branch = new Branch(path, branches.size() + 1, this);
+                        Branch branch = new Branch(path, directories.size() + 1, this);
                         directories.add(branch);
-                    } else if (path.toFile().isFile()) {
-                        leafsSize += path.toFile().length();
+                    } else if (Files.isRegularFile(path)) {
+                        leafsSize += Files.size(path);
                     }
                 }
                 List<Future<Branch>> futures = ThreadManager.service.invokeAll(directories);
                 receiveBranches(futures);
             } catch (AccessDeniedException ex) {
                 // Exception suppressed!!!!
-                ex.printStackTrace();
+                System.out.println(ex);
             }
         } catch (IOException e) {
             e.printStackTrace();

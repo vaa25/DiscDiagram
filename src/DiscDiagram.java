@@ -13,6 +13,7 @@ import javafx.scene.Cursor;
 import javafx.scene.Group;
 import javafx.scene.Scene;
 import javafx.scene.chart.PieChart;
+import javafx.scene.chart.PieChart.Data;
 import javafx.scene.control.ContextMenu;
 import javafx.scene.control.Label;
 import javafx.scene.control.MenuItem;
@@ -28,16 +29,14 @@ import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Iterator;
 import java.util.List;
 
 
 public class DiscDiagram extends Application {
-    public static final Path homeDirectory = Paths.get("D:\\GitHubLocalRepository");
+    public static Path homeDirectory = Paths.get("D:\\Program Files (x86)\\JetBrains\\IntelliJ IDEA Community Edition 14.1\\jre\\jre");
     private Branch currentBranch;
     private PieChart chart;
     private Stage primaryStage;
-    private Group root;
     private Scene scene;
 
     public static void main(String[] args) {
@@ -51,7 +50,7 @@ public class DiscDiagram extends Application {
         int height = 800;
         primaryStage = stage;
         primaryStage.setTitle("Диаграмма диска");
-        root = new Group();
+        Group root = new Group();
         scene = new Scene(root, width + 100, height + 100, Color.BEIGE);
         primaryStage.setScene(scene);
         primaryStage.show();
@@ -76,11 +75,14 @@ public class DiscDiagram extends Application {
         root.getChildren().addAll(chart);
         System.out.println();
     }
-
     private void createNewBranch(Path homeDirectory) {
+        createNewBranch(homeDirectory, 0, null);
+    }
+
+    private void createNewBranch(Path homeDirectory, int id, Branch parent) {
         System.out.println("Создаю дерево каталогов...");
         long start = System.nanoTime();
-        currentBranch = new Branch(homeDirectory);
+        currentBranch = new Branch(homeDirectory, id, parent);
         ThreadManager.service.invoke(currentBranch);
         long finish = System.nanoTime();
         long duration = finish - start;
@@ -109,25 +111,23 @@ public class DiscDiagram extends Application {
     }
 
     private void setGlobalListeners() {
-        root.setOnMouseClicked(event ->
-        {
-            if (isPrimary(event)) {
-                PopupMenuManager.close();
-            }
-        });
-
         scene.setOnKeyReleased(event -> {
             if (event.getCode() == KeyCode.F5) {
-                currentBranch = new Branch(currentBranch.getPath(), currentBranch.getId(), currentBranch.getParent());
+                createNewBranch(currentBranch.getPath(), currentBranch.getId(), currentBranch.getParent());
+                setNewBranchToChart(currentBranch);
             }
         });
         scene.setOnMouseClicked(event -> {
+            if (isPrimary(event)) {
+                PopupMenuManager.close();
+            }
             if (event.isControlDown()) {
                 if (currentBranch.getParent() != null) {
                     setNewBranchToChart(currentBranch.getParent());
                 } else {
                     Path newPath = currentBranch.getPath().getParent();
                     if (newPath != null) {
+                        homeDirectory = newPath;
                         createNewBranch(newPath);
                         setNewBranchToChart(currentBranch);
                     }
@@ -138,7 +138,7 @@ public class DiscDiagram extends Application {
 
 
     private void addDataListeners() {
-        for (final PieChart.Data data : chart.getData()) {
+        for (final Data data : chart.getData()) {
             if (data.getPieValue() > 0.5) {
                 data.getNode().setOnMouseClicked(event -> {
                     System.out.println("data currentBranch = " + currentBranch);
@@ -193,7 +193,7 @@ public class DiscDiagram extends Application {
                                     if (AlertPromptDialog.show(primaryStage,
                                             "Действительно ли вы хотите удалить все файлы из текущего каталога ?")) {
                                         System.out.println("Удаляю файлы");
-                                        //                                    deleteBranchFilesFromDisk(branch);
+                                        deleteBranchFilesFromDisk(currentBranch);
                                     }
                                 }
                             });
@@ -238,79 +238,69 @@ public class DiscDiagram extends Application {
         return event.getButton() == MouseButton.PRIMARY;
     }
 
-    //
     private void deleteBranchFromDisk(Branch branch) {
-
         List<Branch> innerBranches = branch.getBranches();
         for (Branch innerBranch : innerBranches) {
             deleteBranchFromDisk(innerBranch);
         }
+        deleteBranchFilesFromDisk(branch);
+//        delete(branch.getPath());
+    }
+
+    private void deleteBranchFilesFromDisk(Branch branch) {
         Path path = branch.getPath();
         if (branch.getLeafsSize() > 0) {
             try {
                 DirectoryStream<Path> directoryStream = Files.newDirectoryStream(path, "*.*");
-                Iterator<Path> iterator = directoryStream.iterator();
-                while (iterator.hasNext()) {
-                    System.out.println(iterator.next() + " удален");
-//                    Files.deleteIfExists(iterator.next());
+                for (Path pathToDelete : directoryStream) {
+//                    if (delete(pathToDelete)){
+                    System.out.println(pathToDelete + " удален");
+//                    }
                 }
             } catch (IOException e) {
                 e.printStackTrace();
             }
         }
+    }
+
+    private boolean delete(Path pathToDelete) {
         try {
-            Files.deleteIfExists(path);
+            return Files.deleteIfExists(pathToDelete);
         } catch (IOException e) {
             e.printStackTrace();
+            return false;
         }
-
     }
 
     private void setNewBranchToChart(Branch newCurrentBranch) {
-        if (newCurrentBranch != null) {
-            currentBranch = newCurrentBranch;
-            chart.setData(getDataFromCurrentBranch());
-            chart.setTitle("Распределение '" + currentBranch.getPath() + "' по объемам");
-            addDataListeners();
-        }
+        currentBranch = newCurrentBranch;
+        chart.setData(getDataFromCurrentBranch());
+        chart.setTitle("Распределение '" + currentBranch.getPath() + "' по объемам");
+        addDataListeners();
     }
 
-    private ObservableList<PieChart.Data> getDataFromCurrentBranch() {
-        ObservableList<PieChart.Data> pieChartData = FXCollections.observableArrayList();
+    private ObservableList<Data> getDataFromCurrentBranch() {
+        ObservableList<Data> pieChartData = FXCollections.observableArrayList();
         long size = currentBranch.getSize();
         List<Branch> branches = currentBranch.getBranches();
         for (Branch branch : branches) {
             long branchSize = branch.getSize();
-            PieChart.Data data = generateData(size, branchSize, branch.getName());
-//            final Popup popup=new Popup();
-//            popup.setAutoHide(true);
-//            final Label label2 = new Label("");
-//            label2.setStyle("-fx-font: bold 20 Arial;-fx-text-fill:brown");
-//            popup.getContent().addAll(label2);
+            Data data = generateData(size, branchSize, branch.getName());
             pieChartData.add(data);
-
-
         }
-        pieChartData.add(generateData(size, currentBranch.getLeafsSize(), "Различные файлы"));
+        if (currentBranch.getLeafsSize() > 0) {
+            pieChartData.add(generateData(size, currentBranch.getLeafsSize(), "Различные файлы"));
+        }
         return pieChartData;
     }
 
-    private PieChart.Data generateData(long size, long branchSize, String name) {
+    private Data generateData(long size, long branchSize, String name) {
         int kB = 1024;
-        int mB = 1024 * 1024;
+        int mB = kB * 1024;
         int gB = mB * 1024;
         String branchSize$ = String.valueOf(branchSize > gB ? branchSize / gB + " GB" : branchSize > mB ? branchSize / mB + " mB" : branchSize > kB ? branchSize / kB + " kB" : branchSize + " bytes");
         String label = name + "\n" + branchSize$;
         double value = 100.0 * branchSize / size;
-        PieChart.Data data = new PieChart.Data(label, value);
-//        final Popup popup=new Popup();
-//        popup.setAutoHide(true);
-//        final Label label2 = new Label("");
-//        label2.setStyle("-fx-font: bold 20 Arial;-fx-text-fill:brown");
-//        popup.getContent().addAll(label2);
-//        pieChartData.add(data);
-//        System.out.println(label+": "+value);
-        return data;
-
+        return new Data(label, value);
     }
 }
