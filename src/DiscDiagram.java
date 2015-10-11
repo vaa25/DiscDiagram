@@ -30,12 +30,10 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Iterator;
 import java.util.List;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
 
 
 public class DiscDiagram extends Application {
-    public static final Path homeDirectory = Paths.get("D:\\GitHubLocalRepository\\DeliveryService\\src\\main");
+    public static final Path homeDirectory = Paths.get("D:\\GitHubLocalRepository");
     private Branch currentBranch;
     private PieChart chart;
     private Stage primaryStage;
@@ -48,44 +46,24 @@ public class DiscDiagram extends Application {
 
     @Override
     public void start(Stage stage) {
-        long start = System.nanoTime();
-        System.out.println("Создаю дерево каталогов...");
-//        ThreadManager.service= ForkJoinPool.commonPool();
-        Branch trunk = new Branch(homeDirectory);
-        ThreadManager.service.submit(trunk);
-        waitUntilTreeBuilds();
-        ThreadManager.service.shutdown();
-        try {
-            trunk.receiveBranches();
-        } catch (ExecutionException e) {
-            e.printStackTrace();
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        }
-        long finish = System.nanoTime();
-        long duration = finish - start;
-        System.out.println("Дерево каталогов создано за " + toString(duration));
-        currentBranch = trunk;
+        createNewBranch(homeDirectory);
         int width = 1000;
         int height = 800;
-
-
-//
-
         primaryStage = stage;
         primaryStage.setTitle("Диаграмма диска");
         root = new Group();
         scene = new Scene(root, width + 100, height + 100, Color.BEIGE);
         primaryStage.setScene(scene);
         primaryStage.show();
-        chart = new PieChart(getDataFromCurrentBranch());
+        setGlobalListeners();
+        chart = new PieChart();
         chart.setLayoutX(50);
         chart.setLayoutY(10);
         chart.setCursor(Cursor.CROSSHAIR);
         chart.setStyle("-fx-font:bold 14 Arial; -fx-text-fill:brown;");
         chart.setPrefSize(width, height);
         chart.setAnimated(true);
-        chart.setTitle("Распределение " + trunk.getPath() + " по объемам");
+        chart.setTitle("Распределение " + currentBranch.getPath() + " по объемам");
         chart.setTitleSide(Side.TOP);
         chart.setLegendVisible(true);
         chart.setLegendSide(Side.RIGHT);
@@ -93,19 +71,20 @@ public class DiscDiagram extends Application {
         chart.setLabelsVisible(true);
         chart.setLabelLineLength(20);
         chart.setStartAngle(150);
-        setGlobalListeners();
-        addDataListeners();
+        setNewBranchToChart(currentBranch);
 
         root.getChildren().addAll(chart);
         System.out.println();
     }
 
-    private void waitUntilTreeBuilds() {
-        try {
-            ThreadManager.service.awaitTermination(1, TimeUnit.SECONDS);
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        }
+    private void createNewBranch(Path homeDirectory) {
+        System.out.println("Создаю дерево каталогов...");
+        long start = System.nanoTime();
+        currentBranch = new Branch(homeDirectory);
+        ThreadManager.service.invoke(currentBranch);
+        long finish = System.nanoTime();
+        long duration = finish - start;
+        System.out.println("Дерево каталогов создано за " + toString(duration));
     }
 
     private String toString(long duration) {
@@ -149,7 +128,7 @@ public class DiscDiagram extends Application {
                 } else {
                     Path newPath = currentBranch.getPath().getParent();
                     if (newPath != null) {
-                        currentBranch = new Branch(newPath);
+                        createNewBranch(newPath);
                         setNewBranchToChart(currentBranch);
                     }
                 }

@@ -4,10 +4,12 @@ import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
+import java.util.concurrent.RecursiveTask;
 
 /**
  * Created with IntelliJ IDEA.
@@ -18,9 +20,8 @@ import java.util.concurrent.Future;
  *
  * @author Alexander Vlasov
  */
-public class Branch implements Callable<Branch> {
+public class Branch extends RecursiveTask<Branch> implements Callable<Branch> {
     private int id;
-    private List<Future<Branch>> futures;
     private List<Branch> branches;
     private long branchesSize;
     private long leafsSize;
@@ -38,10 +39,9 @@ public class Branch implements Callable<Branch> {
         this.path = path;
     }
 
-    public void receiveBranches() throws ExecutionException, InterruptedException {
+    private void receiveBranches(List<Future<Branch>> futures) {
         for (Future<Branch> future : futures) {
-            Branch branch = future.get();
-            branch.receiveBranches();
+            Branch branch = getBranch(future);
             branches.add(branch);
             branchesSize += branch.size;
         }
@@ -52,8 +52,19 @@ public class Branch implements Callable<Branch> {
             int gB = mB * 1024;
             String size$ = String.valueOf(size > gB ? size / gB + " GB" : size > mB ? size / mB + " mB" : size > kB ? size / kB + " kB" : size + " bytes");
 
-            System.out.println(size$);
+//            System.out.println(size$);
         }
+    }
+
+    private Branch getBranch(Future<Branch> future) {
+        try {
+            return future.get();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        } catch (ExecutionException e) {
+            e.printStackTrace();
+        }
+        return null;
     }
 
     private boolean isFirstChild(Path path, Branch parent) {
@@ -61,41 +72,43 @@ public class Branch implements Callable<Branch> {
     }
 
     @Override
-    public Branch call() throws Exception {
+    protected Branch compute() {
         if (isFirstChild(path, parent)) {
-            System.out.print("Обрабатываю " + path + " и его подкаталоги...   ");
+//            System.out.print("Обрабатываю " + path + " и его подкаталоги...   ");
         }
         branches = new ArrayList<>();
-        futures = new ArrayList<>();
         leafsSize = 0;
         branchesSize = 0;
         addFiles();
         return this;
     }
 
+    @Override
+    public Branch call() throws Exception {
+        return compute();
+    }
+
     private void addFiles() {
         try {
             try (DirectoryStream<Path> entries = Files.newDirectoryStream(path)) {
 //                System.out.println(entries.getClass().getName());
-                for (Path file : entries) {
-                    add(file);
+                Collection<Branch> directories = new ArrayList<>();
+                for (Path path : entries) {
+                    if (Files.isDirectory(path)) {
+                        Branch branch = new Branch(path, branches.size() + 1, this);
+                        directories.add(branch);
+                    } else if (path.toFile().isFile()) {
+                        leafsSize += path.toFile().length();
+                    }
                 }
+                List<Future<Branch>> futures = ThreadManager.service.invokeAll(directories);
+                receiveBranches(futures);
             } catch (AccessDeniedException ex) {
-                // Exception suppress!!!!
+                // Exception suppressed!!!!
                 ex.printStackTrace();
             }
         } catch (IOException e) {
             e.printStackTrace();
-        }
-    }
-
-    private void add(Path path) {
-        if (Files.isDirectory(path)) {
-            Branch branch = new Branch(path, branches.size() + 1, this);
-            Future<Branch> future = ThreadManager.service.submit(branch);
-            futures.add(future);
-        } else if (path.toFile().isFile()) {
-            leafsSize += path.toFile().length();
         }
     }
 
@@ -124,10 +137,10 @@ public class Branch implements Callable<Branch> {
         return size;
     }
 
+
     public Path getPath() {
         return path;
     }
-
 
     public int getId() {
         return id;
