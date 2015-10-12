@@ -6,8 +6,6 @@
 import javafx.application.Application;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
-import javafx.event.ActionEvent;
-import javafx.event.EventHandler;
 import javafx.geometry.Side;
 import javafx.scene.Cursor;
 import javafx.scene.Group;
@@ -163,48 +161,36 @@ public class DiscDiagram extends Application {
                         MenuItem menuItemDel = new MenuItem();
                         if (childBranch != null) {
                             menuItemDel.setText("Удалить '" + childBranch.getName() + "'");
-                            menuItemDel.setOnAction(new EventHandler<ActionEvent>() {
-                                @Override
-                                public void handle(ActionEvent actionEvent) {
-                                    if (AlertPromptDialog.show(primaryStage,
-                                            "Действительно ли вы хотите удалить каталог \n" + data.getName().split("\\n")[0] + "\n co всем его содержимым ?")) {
-                                        System.out.println("Удаляю '" + childBranch.getName() + "'");
-                                        deleteBranchFromDisk(childBranch);
-                                    }
+                            menuItemDel.setOnAction(actionEvent -> {
+                                if (AlertPromptDialog.show(primaryStage,
+                                        "Действительно ли вы хотите удалить каталог \n" + data.getName().split("\\n")[0] + "\n co всем его содержимым ?")) {
+                                    System.out.println("Удаляю '" + childBranch.getName() + "'");
+                                    deleteBranchFromDisk(childBranch);
                                 }
                             });
-                            menuItemOpen.setOnAction(new EventHandler<ActionEvent>() {
-                                @Override
-                                public void handle(ActionEvent actionEvent) {
-                                    try {
-                                        Runtime.getRuntime().exec("explorer.exe " + childBranch.getPath());
-                                    } catch (IOException e) {
-                                        e.printStackTrace();
-                                    }
+                            menuItemOpen.setOnAction(actionEvent -> {
+                                try {
+                                    Runtime.getRuntime().exec("explorer.exe " + childBranch.getPath());
+                                } catch (IOException e) {
+                                    e.printStackTrace();
                                 }
                             });
 
 
                         } else {
                             menuItemDel.setText("Удалить файлы");
-                            menuItemDel.setOnAction(new EventHandler<ActionEvent>() {
-                                @Override
-                                public void handle(ActionEvent actionEvent) {
-                                    if (AlertPromptDialog.show(primaryStage,
-                                            "Действительно ли вы хотите удалить все файлы из текущего каталога ?")) {
-                                        System.out.println("Удаляю файлы");
-                                        deleteBranchFilesFromDisk(currentBranch);
-                                    }
+                            menuItemDel.setOnAction(actionEvent -> {
+                                if (AlertPromptDialog.show(primaryStage,
+                                        "Действительно ли вы хотите удалить все файлы из текущего каталога ?")) {
+                                    System.out.println("Удаляю файлы");
+                                    deleteBranchFilesFromDisk(currentBranch);
                                 }
                             });
-                            menuItemOpen.setOnAction(new EventHandler<ActionEvent>() {
-                                @Override
-                                public void handle(ActionEvent actionEvent) {
-                                    try {
-                                        Runtime.getRuntime().exec("explorer.exe " + currentBranch.getPath());
-                                    } catch (IOException e) {
-                                        e.printStackTrace();
-                                    }
+                            menuItemOpen.setOnAction(actionEvent -> {
+                                try {
+                                    Runtime.getRuntime().exec("explorer.exe " + currentBranch.getPath());
+                                } catch (IOException e) {
+                                    e.printStackTrace();
                                 }
                             });
                         }
