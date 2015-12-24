@@ -31,7 +31,7 @@ import java.util.List;
 
 
 public class DiscDiagram extends Application {
-    public static Path homeDirectory = Paths.get("D:\\Program Files (x86)\\JetBrains\\IntelliJ IDEA Community Edition 14.1\\jre\\jre");
+    public static Path homeDirectory = Paths.get("C:");
     private Branch currentBranch;
     private PieChart chart;
     private Stage primaryStage;
@@ -60,7 +60,7 @@ public class DiscDiagram extends Application {
         chart.setStyle("-fx-font:bold 14 Arial; -fx-text-fill:brown;");
         chart.setPrefSize(width, height);
         chart.setAnimated(true);
-        chart.setTitle("Распределение " + currentBranch.getPath() + " по объемам");
+        chart.setTitle(currentBranch.getPath() + " " + currentBranch.getSize());
         chart.setTitleSide(Side.TOP);
         chart.setLegendVisible(true);
         chart.setLegendSide(Side.RIGHT);
@@ -170,6 +170,7 @@ public class DiscDiagram extends Application {
                             });
                             menuItemOpen.setOnAction(actionEvent -> {
                                 try {
+                                    System.out.println("Открываю в папке " + childBranch.getPath());
                                     Runtime.getRuntime().exec("explorer.exe " + childBranch.getPath());
                                 } catch (IOException e) {
                                     e.printStackTrace();
