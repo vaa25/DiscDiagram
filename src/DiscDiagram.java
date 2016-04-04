@@ -3,6 +3,12 @@
  * the editor.
  */
 
+import java.io.IOException;
+import java.nio.file.DirectoryStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.List;
 import javafx.application.Application;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
@@ -22,16 +28,9 @@ import javafx.scene.paint.Color;
 import javafx.stage.Popup;
 import javafx.stage.Stage;
 
-import java.io.IOException;
-import java.nio.file.DirectoryStream;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.List;
-
 
 public class DiscDiagram extends Application {
-    public static Path homeDirectory = Paths.get("C:");
+    public static Path homeDirectory = Paths.get("C:\\Users\\vaa25\\Documents\\Bluetooth");
     private Branch currentBranch;
     private PieChart chart;
     private Stage primaryStage;
@@ -136,17 +135,17 @@ public class DiscDiagram extends Application {
 
 
     private void addDataListeners() {
-        for (final Data data : chart.getData()) {
-            if (data.getPieValue() > 0.5) {
-                data.getNode().setOnMouseClicked(event -> {
+        for (final Data chartData : chart.getData()) {
+            if (chartData.getPieValue() > 0.5) {
+                chartData.getNode().setOnMouseClicked(event -> {
                     System.out.println("data currentBranch = " + currentBranch);
                     if (isDoubleClick(event)) {
-                        Branch newCurrentBranch = currentBranch.getBranchByName(data.getName());
+                        Branch newCurrentBranch = currentBranch.getBranchByName(chartData.getName());
                         setNewBranchToChart(newCurrentBranch);
                     } else if (isPrimary(event)) {
                         Popup popup = new Popup();
                         popup.setAutoHide(true);
-                        Label label = new Label(String.valueOf(data.getPieValue()).substring(0, 4) + "%");
+                        Label label = new Label(String.valueOf(chartData.getPieValue()).substring(0, 4) + "%");
                         label.setStyle("-fx-font: bold 20 Arial;-fx-text-fill:brown");
                         popup.getContent().addAll(label);
                         popup.setX(event.getScreenX());
@@ -155,7 +154,7 @@ public class DiscDiagram extends Application {
                     }
                     if (isSecondary(event)) {
                         PopupMenuManager.close();
-                        Branch childBranch = currentBranch.getBranchByName(data.getName());
+                        Branch childBranch = currentBranch.getBranchByName(chartData.getName());
                         ContextMenu contextMenu = new ContextMenu();
                         MenuItem menuItemOpen = new MenuItem("Открыть в папке");
                         MenuItem menuItemDel = new MenuItem();
@@ -163,18 +162,14 @@ public class DiscDiagram extends Application {
                             menuItemDel.setText("Удалить '" + childBranch.getName() + "'");
                             menuItemDel.setOnAction(actionEvent -> {
                                 if (AlertPromptDialog.show(primaryStage,
-                                        "Действительно ли вы хотите удалить каталог \n" + data.getName().split("\\n")[0] + "\n co всем его содержимым ?")) {
+                                        "Действительно ли вы хотите удалить каталог \n" +
+                                                chartData.getName().split("\\n")[0] + "\n co всем его содержимым ?")) {
                                     System.out.println("Удаляю '" + childBranch.getName() + "'");
                                     deleteBranchFromDisk(childBranch);
                                 }
                             });
                             menuItemOpen.setOnAction(actionEvent -> {
-                                try {
-                                    System.out.println("Открываю в папке " + childBranch.getPath());
-                                    Runtime.getRuntime().exec("explorer.exe " + childBranch.getPath());
-                                } catch (IOException e) {
-                                    e.printStackTrace();
-                                }
+                                openFolder(childBranch);
                             });
 
 
@@ -188,11 +183,7 @@ public class DiscDiagram extends Application {
                                 }
                             });
                             menuItemOpen.setOnAction(actionEvent -> {
-                                try {
-                                    Runtime.getRuntime().exec("explorer.exe " + currentBranch.getPath());
-                                } catch (IOException e) {
-                                    e.printStackTrace();
-                                }
+                                openFolder(currentBranch);
                             });
                         }
                         contextMenu.setHideOnEscape(true);
@@ -212,6 +203,16 @@ public class DiscDiagram extends Application {
 
     }
 
+    private void openFolder(Branch childBranch) {
+        try {
+            Path path = childBranch.getPath();
+            System.out.println("Открываю в папке " + path);
+            Runtime.getRuntime().exec("Explorer.exe /e, /root, \"" + path + "\"");
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
     private boolean isSecondary(MouseEvent event) {
         return event.getButton() == MouseButton.SECONDARY;
     }
@@ -221,7 +222,6 @@ public class DiscDiagram extends Application {
     }
 
     private boolean isPrimary(MouseEvent event) {
-        System.out.println(event.getButton());
         return event.getButton() == MouseButton.PRIMARY;
     }
 

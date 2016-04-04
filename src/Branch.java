@@ -36,36 +36,9 @@ public class Branch extends RecursiveTask<Branch> implements Callable<Branch> {
         this.path = path;
     }
 
-    private void receiveBranches(List<Future<Branch>> futures) {
-        for (Future<Branch> future : futures) {
-            Branch branch = getBranch(future);
-            branches.add(branch);
-            branchesSize += branch.size;
-        }
-        size = branchesSize + leafsSize;
-
-    }
-
-    private String getSize$() {
-        int kB = 1024;
-        int mB = kB * 1024;
-        int gB = mB * 1024;
-        return String.valueOf(size > gB ? size / gB + " GB" : size > mB ? size / mB + " mB" : size > kB ? size / kB + " kB" : size + " bytes");
-    }
-
-    private Branch getBranch(Future<Branch> future) {
-        try {
-            return future.get();
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        } catch (ExecutionException e) {
-            e.printStackTrace();
-        }
-        return null;
-    }
-
-    private boolean isFirstChild(Path path, Branch parent) {
-        return parent != null && Files.isDirectory(path) && DiscDiagram.homeDirectory.equals(path.getParent());
+    @Override
+    public Branch call() throws Exception {
+        return compute();
     }
 
     @Override
@@ -75,15 +48,10 @@ public class Branch extends RecursiveTask<Branch> implements Callable<Branch> {
         leafsSize = 0;
         branchesSize = 0;
         addFiles();
-        if (isFirstChild(path, parent)) {
+        if (isThisBranchIsFirstChild(path, parent)) {
             System.out.println("Обработал " + path + " и его подкаталоги...   " + getSize$());
         }
         return this;
-    }
-
-    @Override
-    public Branch call() throws Exception {
-        return compute();
     }
 
     private void addFiles() {
@@ -102,11 +70,43 @@ public class Branch extends RecursiveTask<Branch> implements Callable<Branch> {
                 receiveBranches(futures);
             } catch (AccessDeniedException ex) {
                 // Exception suppressed!!!!
-                System.out.println(ex);
+                System.out.println(ex.getMessage());
             }
         } catch (IOException e) {
             e.printStackTrace();
         }
+    }
+
+    private boolean isThisBranchIsFirstChild(Path path, Branch parent) {
+        return parent != null && Files.isDirectory(path) && DiscDiagram.homeDirectory.equals(path.getParent());
+    }
+
+    private String getSize$() {
+        int kB = 1024;
+        int mB = kB * 1024;
+        int gB = mB * 1024;
+        return String.valueOf(size > gB ? size / gB + " GB" : size > mB ? size / mB + " mB" : size > kB ? size / kB + " kB" : size + " bytes");
+    }
+
+    private void receiveBranches(List<Future<Branch>> futures) {
+        for (Future<Branch> future : futures) {
+            Branch branch = getBranch(future);
+            branches.add(branch);
+            branchesSize += branch.size;
+        }
+        size = branchesSize + leafsSize;
+
+    }
+
+    private Branch getBranch(Future<Branch> future) {
+        try {
+            return future.get();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        } catch (ExecutionException e) {
+            e.printStackTrace();
+        }
+        return null;
     }
 
     public Branch getParent() {
@@ -139,10 +139,6 @@ public class Branch extends RecursiveTask<Branch> implements Callable<Branch> {
         return path;
     }
 
-    public int getId() {
-        return id;
-    }
-
     @Override
     public String toString() {
         return path.toString();
@@ -157,5 +153,9 @@ public class Branch extends RecursiveTask<Branch> implements Callable<Branch> {
             }
         }
         return null;
+    }
+
+    public int getId() {
+        return id;
     }
 }
